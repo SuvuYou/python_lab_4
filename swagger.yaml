@@ -314,6 +314,12 @@ components:
         name:
           type: string
           example: "name"
+        email:
+          type: string
+          example: "some@gmail.com"
+        password:
+          type: string
+          example: "123456"
         position:
           type: string
           example: "student"
