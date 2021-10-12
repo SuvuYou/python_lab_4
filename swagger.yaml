@@ -267,7 +267,7 @@ paths:
           description: Course not found
   /requestToJoin/{requestID}:
     description: request to join a course
-    post:
+    put:
       tags:
         - requestToJoin
       description: change specific course
@@ -284,8 +284,7 @@ paths:
         content:
           application/json:
             schema:
-              type: boolean
-              example: true
+              $ref: "#/components/schemas/JoinRequest"
       responses:
         200:
           description: Success response
@@ -328,7 +327,7 @@ components:
           example: "123456"
         position:
           type: string
-          example: "student"
+          example: "teacher"
     JoinRequest:
       type: object
       properties:
@@ -338,6 +337,9 @@ components:
         CourseID:
           type: integer
           example: 1
+        status:
+          type: string
+          example: "pending"
     Student:
       type: object
       properties:
