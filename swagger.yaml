@@ -1,0 +1,368 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: Courses API
+  description: Courses API made for Applicational Programming class
+servers:
+  - url: http://staging.com
+  - url: http://staging.com
+tags:
+  - name: courses
+  - name: users
+  - name: requestToJoin
+paths:
+  /courses:
+    description: list of all courses
+    get:
+      tags:
+        - courses
+      description: get list of all courses
+      responses:
+        200:
+          description: Success responce
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Course"
+        404:
+          description: Courses not found
+    post:
+      tags:
+        - courses
+      description: add a new course
+      security:
+        - OAuth2: [teacher]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Course"
+      responses:
+        200:
+          description: Success responce
+        405:
+          description: Invalid input
+  /courses/{id}:
+    description: specific course
+    get:
+      tags:
+        - courses
+      description: get specific course
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        200:
+          description: Success responce
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Course"
+        404:
+          description: Course not found
+    delete:
+      tags:
+        - courses
+      description: get specific course
+      security:
+        - OAuth2: [teacher]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        200:
+          description: Success responce
+        404:
+          description: Course not found
+    put:
+      tags:
+        - courses
+      description: change specific course
+      security:
+        - OAuth2: [teacher]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Course"
+      responses:
+        200:
+          description: Success response
+        400:
+          description: Invalid ID input
+        404:
+          description: Course not found
+  /courses/{id}/students:
+    description: students of a specific course
+    post:
+      tags:
+        - courses
+      description: change specific course
+      security:
+        - OAuth2: [teacher]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/Student"
+      responses:
+        200:
+          description: Success response
+        400:
+          description: Invalid ID input
+        404:
+          description: Course not found
+  /user/{id}:
+    description: info about user
+    get:
+      tags:
+        - users
+      security:
+        - OAuth2: [teacher, student]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      description: get user info
+      responses:
+        200:
+          description: Success responce
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        404:
+          description: User not found
+    delete:
+      tags:
+        - users
+      description: delete specific user
+      security:
+        - OAuth2: [teacher, student]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      responses:
+        200:
+          description: Success responce
+        404:
+          description: user not found
+    put:
+      tags:
+        - users
+      description: change user
+      security:
+        - OAuth2: [teacher]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        200:
+          description: Success response
+        400:
+          description: Invalid ID input
+        404:
+          description: Course not found
+  /user/login:
+    description: user login
+    get:
+      tags:
+        - users
+      description: login user
+      responses:
+        200:
+          description: Success responce
+        405:
+          description: Invalid inout
+  /user/logout:
+    description: user logout
+    get:
+      tags:
+        - users
+      description: login user
+      responses:
+        200:
+          description: Success responce
+        405:
+          description: Invalid inout
+  /user:
+    post:
+      tags:
+        - users
+      description: add new user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+
+      responses:
+        200:
+          description: Success response
+        400:
+          description: Invalid ID input
+        404:
+          description: Course not found
+  /requestToJoin:
+    description: request to join a course
+    post:
+      tags:
+        - requestToJoin
+      description: change specific course
+      security:
+        - OAuth2: [student]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinRequest"
+      responses:
+        200:
+          description: Success response
+        400:
+          description: Invalid ID input
+        404:
+          description: Course not found
+  /requestToJoin/{requestID}:
+    description: request to join a course
+    post:
+      tags:
+        - requestToJoin
+      description: change specific course
+      security:
+        - OAuth2: [teacher]
+      parameters:
+        - in: path
+          name: requestID
+          required: true
+          schema:
+            type: integer
+            example: 1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: boolean
+              example: true
+      responses:
+        200:
+          description: Success response
+        400:
+          description: Invalid ID input
+        404:
+          description: Course not found
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://example.com/oauth/authorize
+          tokenUrl: https://example.com/oauth/token
+          scopes:
+            student: Grants read access
+            teacher: Grants write access
+  headers:
+    Api-token:
+      schema:
+        type: string
+        example: "ast4ldONfniNEForpmF2omfE-EfmnEpnf_ean64IW"
+  schemas:
+    User:
+      type: object
+      properties:
+        userID:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: "name"
+        email:
+          type: string
+          example: "some@gmail.com"
+        password:
+          type: string
+          example: "123456"
+        position:
+          type: string
+          example: "student"
+    JoinRequest:
+      type: object
+      properties:
+        StudentID:
+          type: integer
+          example: 23522
+        CourseID:
+          type: integer
+          example: 1
+    Student:
+      type: object
+      properties:
+        StudentID:
+          type: integer
+          example: 4
+        StudentName:
+          type: string
+          example: "test name"
+        GPA:
+          type: number
+          example: 3.5
+    Course:
+      type: object
+      properties:
+        CourseID:
+          type: integer
+          example: 1
+        Subject:
+          type: string
+          example: "Math"
+        TeacherName:
+          type: string
+          example: "teacher test name"
+        Students:
+          type: array
+          items:
+            $ref: "#/components/schemas/Student"
