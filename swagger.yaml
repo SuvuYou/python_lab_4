@@ -139,6 +139,8 @@ paths:
     get:
       tags:
         - users
+      security:
+        - OAuth2: [teacher, student]
       parameters:
         - in: path
           name: id
@@ -158,6 +160,8 @@ paths:
       tags:
         - users
       description: delete specific user
+      security:
+        - OAuth2: [teacher, student]
       parameters:
         - in: path
           name: id
@@ -221,9 +225,7 @@ paths:
     post:
       tags:
         - users
-      description: change specific course
-      security:
-        - OAuth2: [teacher]
+      description: add new user
       requestBody:
         content:
           application/json:
