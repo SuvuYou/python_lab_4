@@ -26,6 +26,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Course"
+        404:
+          description: Courses not found
     post:
       tags:
         - courses
@@ -62,6 +64,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Course"
+        404:
+          description: Course not found
     delete:
       tags:
         - courses
@@ -156,6 +160,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/User"
+        404:
+          description: User not found
     delete:
       tags:
         - users
@@ -263,7 +269,7 @@ paths:
     description: request to join a course
     post:
       tags:
-        - courses
+        - requestToJoin
       description: change specific course
       security:
         - OAuth2: [teacher]
