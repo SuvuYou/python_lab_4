@@ -1,61 +1,57 @@
-from sqlalchemy import Column, Integer, String, Date
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
-# class Advertiser(Base):
-#     __tablename__ = 'advertiser'
+class Student(Base):
+    __tablename__ = 'student'
 
-#     advertiser_id=Column(Integer, primary_key=True)
-#     first_name=Column('first_name', String(32))
-#     last_name=Column('last_name', String(32))
-#     position=Column('position', String(32))
-#     experience=Column('experience', Integer)
+    student_id=Column(Integer, primary_key=True)
+    first_name=Column('first_name', String(32))
+    last_name=Column('last_name', String(32))
+    email=Column('email', String(32))
+    password=Column('password', String(32))
+    Iq=Column("iq", Integer)
+    Gpa=Column('GPA', Integer)
 
-# class Advertising_campaign(Base):
-#     __tablename__ = 'advertising_campaign'
+class Professor(Base):
+    __tablename__ = 'professor'
 
-#     campaign_id=Column(Integer, primary_key=True)
-#     environment_id=Column('environment_id', Integer)
-#     team_id=Column('team_id', Integer)
-#     costumer_id=Column('costumer_id', Integer)
-#     budget=Column('budget', Integer)    
-#     start_date=Column('start_date', Date)   
-#     end_date=Column('end_date', Date)   
+    professor_id=Column(Integer, primary_key=True)
+    first_name=Column('first_name', String(32))
+    last_name=Column('last_name', String(32))
+    email=Column('email', String(32))
+    password=Column('password', String(32))
+    subject=Column('subject', String(32))
 
-# class Advertising_team(Base):
-#     __tablename__ = 'advertising_team'
+class Course(Base):
+    __tablename__ = 'course'
 
-#     team_id=Column(Integer, primary_key=True)
-#     advertiser_id=Column('advertiser_id', Integer)
+    course_id=Column(Integer, primary_key=True)
+    professor_id=Column(Integer, ForeignKey('professor.professor_id'))
+    subject=Column('subject', String(32))
 
-# class Costumer(Base):
-#     __tablename__ = 'costumer'
+    professor = relationship("Professor")
 
-#     costumer_id=Column(Integer, primary_key=True)
-#     first_name=Column('first_name', String(32))    
-#     last_name=Column('last_name', String(32))    
 
-# class Environment(Base):
-#     __tablename__ = 'environment'
+class Course_student(Base):
+    __tablename__ = 'course_student'
 
-#     costumer_id=Column(Integer, primary_key=True)
-#     target_id=Column('target_id', Integer)    
-#     social_media=Column('social_media', String(32))    
+    course_student_id=Column(Integer, primary_key=True)
+    course_id=Column(Integer, ForeignKey('course.course_id'))
+    student_id=Column(Integer, ForeignKey('student.student_id'))
 
-# class Payment(Base):
-#     __tablename__ = 'payment'
+    course = relationship("Course")
+    student = relationship("Student")
 
-#     payment_id=Column(Integer, primary_key=True)
-#     costumer_id=Column('costumer_id', Integer)    
-#     campaign_id=Column('campaign_id', Integer)    
-#     description=Column('description', String(255))    
-#     amount=Column('amount', Integer)    
-#     date=Column('date', Date)    
+class Join_request(Base):
+    __tablename__ = 'join_request'
 
-# class Target(Base):
-#     __tablename__ = 'target'
+    join_request_id=Column(Integer, primary_key=True)
+    course_id=Column(Integer, ForeignKey('course.course_id'))
+    student_id=Column(Integer, ForeignKey('student.student_id'))
+    status=Column('status', String(32))   
 
-#     target_id=Column(Integer, primary_key=True)
-#     age_group=Column('age_group', Integer)    
-#     intrest_group=Column('intrest_group', String(255))    
+    course = relationship("Course")
+    student = relationship("Student")
