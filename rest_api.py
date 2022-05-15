@@ -1,30 +1,69 @@
 import flask.scaffold
 flask.helpers._endpoint_from_view_func = flask.scaffold._endpoint_from_view_func
 from flask_restful import Resource, Api, abort, marshal_with
+from flask import request, jsonify
 from rest_models import app, db, Student, Professor, Course, Join_Request, Course_Student
 from rest_models import rf_student, args_student, rf_professor, args_professor, rf_course, args_course, rf_join_request, args_join_request, rf_course_student, args_course_student
 from rest_models import args_student_update, args_professor_update, args_course_update, args_join_request_update
+import jwt
+import datetime
+from functools import wraps
 
 api = Api(app)
 
-class Students(Resource):
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization']
+
+        if not token:
+            abort(401, message="Token is missing")
+
+        try: 
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms="HS256")
+            if data['user_type'] == "student":
+                current_user = Student.query.filter_by(student_id=data['public_id']).first()
+            else:
+                current_user = Professor.query.filter_by(professor_id=data['public_id']).first()    
+        except:
+            abort(401, message="Token is missing")
+
+        current_user.user_type = data['user_type']
+
+        return f(current_user, *args, **kwargs)
+
+    return decorated
+
+class Students(Resource):    
     @marshal_with(rf_student)
-    def get(self, id):
+    @token_required 
+    def get(current_user, self, id):
         result = Student.query.get(id)
         if not result:
             abort(404, message="student does not exist")
+
+        if not current_user.first_name == result.first_name:
+            abort(403, message="Access denied")    
         return result
 
     @marshal_with(rf_student)
     def post(self, id):
         arguments = args_student.parse_args()
+        result = Student.query.filter_by(first_name=arguments.first_name)
+        if result.first():
+            abort(404, message="student with such name already exist")
+
         student = Student(first_name=arguments.first_name, last_name=arguments.last_name, email=arguments.email, password=arguments.password, GPA=arguments.GPA, iq=arguments.iq)
         db.session.add(student)
         db.session.commit()
         return student, 201    
 
     @marshal_with(rf_student)
-    def patch(self, id):
+    @token_required 
+    def patch(current_user, self, id):
         dict = {}
         args = args_student_update.parse_args()
         for arg in args:
@@ -34,16 +73,26 @@ class Students(Resource):
         result = Student.query.filter_by(student_id=id)
         if not result.first():
             abort(404, message="student does not exist")
+
+        student = result.first()
+
+        if not current_user.first_name == student.first_name:
+            abort(403, message="Access denied")       
+        
         result.update(dict)
         db.session.commit()
-        return result.first(), 201     
+        return student, 201     
 
     @marshal_with(rf_student)
-    def delete(self, id):
+    @token_required 
+    def delete(current_user, self, id):
         result = Student.query.filter_by(student_id=id)
         deletedObj = result.first()
         if not deletedObj:
             abort(404, message="student does not exist")
+
+        if not current_user.first_name == deletedObj.first_name:
+            abort(403, message="Access denied")      
         result.delete()
         db.session.commit()
         return deletedObj, 201
@@ -51,22 +100,31 @@ class Students(Resource):
 
 class Professors(Resource):
     @marshal_with(rf_professor)
-    def get(self, id):
+    @token_required 
+    def get(current_user, self, id):
         result = Professor.query.get(id)
         if not result:
             abort(404, message="professor does not exist")
+
+        if not current_user.first_name == result.first_name:
+            abort(403, message="Access denied")          
         return result
 
     @marshal_with(rf_professor)
     def post(self, id):
         arguments = args_professor.parse_args()
+        result = Professor.query.filter_by(first_name=arguments.first_name)
+        if result.first():
+            abort(404, message="professor with such name already exist")
+
         professor = Professor(first_name=arguments.first_name, last_name=arguments.last_name, email=arguments.email, password=arguments.password, subject=arguments.subject)
         db.session.add(professor)
         db.session.commit()
         return professor, 201        
 
     @marshal_with(rf_professor)
-    def patch(self, id):
+    @token_required 
+    def patch(current_user, self, id):
         dict = {}
         args = args_professor_update.parse_args()
         for arg in args:
@@ -76,30 +134,51 @@ class Professors(Resource):
         result = Professor.query.filter_by(professor_id=id)
         if not result.first():
             abort(404, message="professor does not exist")
+
+        prof = result.first()
+
+        if not current_user.first_name == prof.first_name:
+            abort(403, message="Access denied")              
         result.update(dict)
         db.session.commit()
-        return result.first(), 201 
+        return prof, 201 
 
     @marshal_with(rf_professor)
-    def delete(self, id):
+    @token_required
+    def delete(current_user, self, id):
         result = Professor.query.filter_by(professor_id=id)
         deletedObj = result.first()
         if not deletedObj:
             abort(404, message="professor does not exist")
+
+        if not current_user.first_name == deletedObj.first_name:
+            abort(403, message="Access denied")     
         result.delete()
         db.session.commit()
         return deletedObj, 201
 
 class Courses(Resource):
     @marshal_with(rf_course)
-    def get(self, id):
+    @token_required
+    def get(current_user, self, id):
         result = Course.query.get(id)
         if not result:
             abort(404, message="course does not exist")
+
+        if current_user.user_type == "professor" and result.professor_id != current_user.professor_id:
+            abort(403, message="Access denied")  
+        elif current_user.user_type == "student":
+            course_student = Course_Student.query.filter_by(course_id=result.course_id, student_id=current_user.student_id).first()
+            if not course_student:
+                abort(403, message="Access denied")  
+
         return result
 
     @marshal_with(rf_course)
-    def post(self, id):
+    @token_required
+    def post(current_user, self, id):
+        if current_user.user_type == "student":
+            abort(403, message="Access denied")  
         arguments = args_course.parse_args()
         result = Professor.query.filter_by(professor_id=arguments.professor_id)
         profObj = result.first()
@@ -111,7 +190,8 @@ class Courses(Resource):
         return course, 201   
 
     @marshal_with(rf_course)
-    def patch(self, id):
+    @token_required
+    def patch(current_user, self, id):
         dict = {}
         args = args_course_update.parse_args()
         for arg in args:
@@ -122,7 +202,12 @@ class Courses(Resource):
         if not result.first():
             abort(404, message="course does not exist")
 
-        if dict["professor_id"]:
+        if current_user.user_type == "professor" and result.first().professor_id != current_user.professor_id:
+            abort(403, message="Access denied")  
+        elif current_user.user_type == "student":
+            abort(403, message="Access denied")
+
+        if "professor_id" in dict:
            result = Professor.query.filter_by(professor_id=dict["professor_id"])
            courObj = result.first()
            if not courObj:
@@ -133,21 +218,35 @@ class Courses(Resource):
         return result.first(), 201 
 
     @marshal_with(rf_course)
-    def delete(self, id):
+    @token_required
+    def delete(current_user, self, id):
         result = Course.query.filter_by(course_id=id)
         deletedObj = result.first()
         if not deletedObj:
             abort(404, message="course does not exist")
+
+        if current_user.user_type == "professor" and result.professor_id != current_user.professor_id:
+            abort(403, message="Access denied")  
+        elif current_user.user_type == "student":
+            abort(403, message="Access denied")    
         result.delete()
         db.session.commit()
         return deletedObj, 201
 
 class Join_Requests(Resource):
     @marshal_with(rf_join_request)
-    def get(self, id):
+    @token_required
+    def get(current_user, self, id):
         result = Join_Request.query.get(id)
         if not result:
             abort(404, message="join request does not exist")
+
+        if current_user.user_type == "professor":
+            course_professor = Course.query.filter_by(course_id=result.course_id, professor_id=current_user.professor_id).first()
+            if not course_professor:
+                abort(403, message="Access denied") 
+        elif current_user.user_type == "student" and result.student_id != current_user.student_id:
+            abort(403, message="Access denied")    
         return result
 
     @marshal_with(rf_join_request)
@@ -184,8 +283,17 @@ class Join_Requests(Resource):
         return join_request, 201   
 
     @marshal_with(rf_join_request)
-    def patch(self, id):
+    @token_required
+    def patch(current_user, self, id):
         result = Join_Request.query.get(id)
+
+        if current_user.user_type == "professor":
+            course_professor = Course.query.filter_by(course_id=result.course_id, professor_id=current_user.professor_id).first()
+            if not course_professor:
+                abort(403, message="Access denied") 
+        elif current_user.user_type == "student":
+            abort(403, message="Access denied")    
+
         if result and (result.status == "success" or result.status == "error"):
             abort(400, message="join request already resolved")
         dict = {}
@@ -194,13 +302,13 @@ class Join_Requests(Resource):
             if (args[arg]):
                dict[arg] = args[arg]
 
-        if dict["course_id"]:
+        if hasattr(dict, "course_id"):
            result = Course.query.filter_by(course_id=dict["course_id"])
            courObj = result.first()
            if not courObj:
             abort(404, message="course does not exist") 
  
-        if dict["student_id"]:
+        if hasattr(dict, "student_id"):
            result = Student.query.filter_by(student_id=dict["student_id"])
            studObj = result.first()
            if not studObj:
@@ -220,11 +328,19 @@ class Join_Requests(Resource):
         return result.first(), 201 
 
     @marshal_with(rf_join_request)
-    def delete(self, id):
+    @token_required
+    def delete(current_user, self, id):
         result = Join_Request.query.filter_by(join_request_id=id)
         deletedObj = result.first()
         if not deletedObj:
             abort(404, message="join request does not exist")
+
+        if current_user.user_type == "professor":
+            course_professor = Course.query.filter_by(course_id=result.course_id, professor_id=current_user.professor_id).first()
+            if not course_professor:
+                abort(403, message="Access denied") 
+        elif current_user.user_type == "student":
+            abort(403, message="Access denied")    
         result.delete()
         db.session.commit()
         return deletedObj, 201
@@ -238,7 +354,8 @@ class Course_Students(Resource):
         return result
 
     @marshal_with(rf_course_student)
-    def post(self, id):
+    @token_required
+    def post(current_user, self, id):
         arguments = args_course_student.parse_args()
 
         result = Course.query.filter_by(course_id=arguments.course_id)
@@ -250,6 +367,13 @@ class Course_Students(Resource):
 
         if not courObj:
             abort(404, message="course does not exist")   
+
+        if current_user.user_type == "professor":
+            course_professor = Course.query.filter_by(course_id=courObj.course_id, professor_id=current_user.professor_id).first()
+            if not course_professor:
+                abort(403, message="Access denied") 
+        elif current_user.user_type == "student":
+            abort(403, message="Access denied")      
 
         course_student = Course_Student(course_id=arguments['course_id'], student_id=arguments['student_id'])
         students_in_course = Course_Student.query.filter_by(course_id=arguments['course_id'])
@@ -265,11 +389,19 @@ class Course_Students(Resource):
         return course_student, 201 
 
     @marshal_with(rf_course_student)
-    def delete(self, id):
+    @token_required
+    def delete(current_user, self, id):
         result = Course_Student.query.filter_by(course_student_id=id)
         deletedObj = result.first()
         if not deletedObj:
             abort(404, message="course student does not exist")
+
+        if current_user.user_type == "professor":
+            course_professor = Course.query.filter_by(course_id=deletedObj.course_id, professor_id=current_user.professor_id).first()
+            if not course_professor:
+                abort(403, message="Access denied") 
+        elif current_user.user_type == "student":
+            abort(403, message="Access denied")          
         result.delete()
         db.session.commit()
         return deletedObj, 201
@@ -280,12 +412,45 @@ class Courses_List(Resource):
         result = Course.query.filter_by().all()
         return result
 
+class Login(Resource):
+    def post(self):
+        auth = request.authorization
+        print('print')
+        if not auth or not auth.username or not auth.password:
+            abort(401, message="Could not verify")
+
+        user = Student.query.filter_by(first_name=auth.username).first()
+
+        if user: 
+            user_type = "student"
+        else:
+            user = Professor.query.filter_by(first_name=auth.username).first()
+            user_type = "professor"
+
+        if not user:
+            abort(401, message="Could not verify")
+
+        if user_type == "student":
+            pub_id = user.student_id
+        else:
+            pub_id = user.professor_id     
+
+        if user.password == auth.password:
+            token = jwt.encode({'public_id' : pub_id, "user_type": user_type, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(hours=24)}, app.config['SECRET_KEY'])
+            
+            return jsonify({'token' : token})
+           
+
+        abort(401, message="Could not verify")
+      
+
 api.add_resource(Students, "/students/<int:id>")
 api.add_resource(Professors, "/professors/<int:id>")
 api.add_resource(Courses, "/courses/<int:id>")
 api.add_resource(Courses_List, "/courses/")
 api.add_resource(Join_Requests, "/join_requests/<int:id>")
 api.add_resource(Course_Students, "/course_students/<int:id>")
+api.add_resource(Login, "/login")
 
 if __name__ == "__main__":
     app.run(debug = True)

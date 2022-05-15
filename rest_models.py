@@ -1,9 +1,12 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_restful import reqparse, fields
+from flask_cors import CORS
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = 'mysql://root:11111111@localhost:3306/online_courses_lab'
+CORS(app)
+app.config["SQLALCHEMY_DATABASE_URI"] = 'mysql://root:11111111@localhost:3306/online_courses_pp_lab'
+app.config['SECRET_KEY'] = 'lolsecret'
 db = SQLAlchemy(app)
 
 class Student(db.Model):
@@ -84,7 +87,7 @@ class Course(db.Model):
     __tablename__ = 'course'
 
     course_id=db.Column(db.Integer, primary_key=True)
-    professor_id=db.Column(db.Integer, db.ForeignKey('professor.professor_id'))
+    professor_id=db.Column(db.Integer, db.ForeignKey('professor.professor_id', ondelete='CASCADE'))
     subject=db.Column('subject', db.String(32))
 
 rf_course = {
@@ -105,8 +108,8 @@ class Join_Request(db.Model):
     __tablename__ = 'join_request'
 
     join_request_id=db.Column(db.Integer, primary_key=True)
-    course_id=db.Column(db.Integer, db.ForeignKey('course.course_id'))
-    student_id=db.Column(db.Integer, db.ForeignKey('student.student_id'))
+    course_id=db.Column(db.Integer, db.ForeignKey('course.course_id', ondelete='CASCADE'))
+    student_id=db.Column(db.Integer, db.ForeignKey('student.student_id', ondelete='CASCADE'))
     status=db.Column('status', db.String(32))
 
 rf_join_request = {
@@ -130,8 +133,8 @@ class Course_Student(db.Model):
     __tablename__ = 'course_student'
 
     course_student_id=db.Column(db.Integer, primary_key=True)
-    course_id=db.Column(db.Integer, db.ForeignKey('course.course_id'))
-    student_id=db.Column(db.Integer, db.ForeignKey('student.student_id'))
+    course_id=db.Column(db.Integer, db.ForeignKey('course.course_id', ondelete='CASCADE'))
+    student_id=db.Column(db.Integer, db.ForeignKey('student.student_id', ondelete='CASCADE'))
 
     courses = db.relationship('Course', backref='course_student', lazy=True)
     students = db.relationship('Student', backref='course_student', lazy=True)
