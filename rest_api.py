@@ -52,9 +52,10 @@ class Students(Resource):
     @marshal_with(rf_student)
     def post(self, id):
         arguments = args_student.parse_args()
-        result = Student.query.filter_by(first_name=arguments.first_name)
-        if result.first():
-            abort(404, message="student with such name already exist")
+        result1 = Student.query.filter_by(email=arguments.email)
+        result2 = Professor.query.filter_by(email=arguments.email)
+        if result1.first() or result2.first() :
+            abort(404, message="User with such email already exist")
 
         student = Student(first_name=arguments.first_name, last_name=arguments.last_name, email=arguments.email, password=arguments.password, GPA=arguments.GPA, iq=arguments.iq)
         db.session.add(student)
@@ -113,9 +114,10 @@ class Professors(Resource):
     @marshal_with(rf_professor)
     def post(self, id):
         arguments = args_professor.parse_args()
-        result = Professor.query.filter_by(first_name=arguments.first_name)
-        if result.first():
-            abort(404, message="professor with such name already exist")
+        result1 = Student.query.filter_by(email=arguments.email)
+        result2 = Professor.query.filter_by(email=arguments.email)
+        if result1.first() or result2.first() :
+            abort(404, message="User with such email already exist")
 
         professor = Professor(first_name=arguments.first_name, last_name=arguments.last_name, email=arguments.email, password=arguments.password, subject=arguments.subject)
         db.session.add(professor)
@@ -415,30 +417,36 @@ class Courses_List(Resource):
 class Login(Resource):
     def post(self):
         auth = request.authorization
-        print('print')
+
         if not auth or not auth.username or not auth.password:
             abort(401, message="Could not verify")
 
-        user = Student.query.filter_by(first_name=auth.username).first()
+        user = Student.query.filter_by(email=auth.username).first()
 
         if user: 
             user_type = "student"
         else:
-            user = Professor.query.filter_by(first_name=auth.username).first()
+            user = Professor.query.filter_by(email=auth.username).first()
             user_type = "professor"
 
         if not user:
-            abort(401, message="Could not verify")
+            abort(401, message="User doesn't exist")
 
         if user_type == "student":
             pub_id = user.student_id
         else:
             pub_id = user.professor_id     
 
+        userData = {}
+        if user_type == "student":
+            userData = {'id': user.student_id, "firstName": user.first_name, "lastName": user.last_name, "type": user_type}
+        else:
+            userData = {'id': user.professor_id, "firstName": user.first_name, "lastName": user.last_name, "type": user_type} 
+
         if user.password == auth.password:
             token = jwt.encode({'public_id' : pub_id, "user_type": user_type, 'exp' : datetime.datetime.utcnow() + datetime.timedelta(hours=24)}, app.config['SECRET_KEY'])
-            
-            return jsonify({'token' : token})
+  
+            return jsonify({'token' : token, "user": userData})
            
 
         abort(401, message="Could not verify")
