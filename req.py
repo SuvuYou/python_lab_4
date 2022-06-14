@@ -9,12 +9,12 @@ COURSE_STUDENTS = "course_students/"
 
 
 # succ
-# responce = requests.get(BASE + COURSES)
+# responce = requests.post(BASE + COURSES, {})
 # succ
 # responce = requests.post(BASE + STUDENTS + "0", {"first_name": "some name1", "last_name": "some last name1", "email": "someemail@gmail.com", "password": "qweqweqwe", "iq": 100, "GPA": 5})
 # succ
 
-responce = requests.post(BASE + "login", auth=("name", "123456"))
+# responce = requests.post(BASE + "login", auth=("name", "123456"))
 
 # responce = requests.post(BASE + PROFESSORS + "0", {"first_name": "some name1", "last_name": "some last name1", "email": "someemail@gmail.com", "password": "qweqweqwe", "subject": "Litrature"})
 # succ

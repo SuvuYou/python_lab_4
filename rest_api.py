@@ -3,7 +3,7 @@ flask.helpers._endpoint_from_view_func = flask.scaffold._endpoint_from_view_func
 from flask_restful import Resource, Api, abort, marshal_with
 from flask import request, jsonify
 from rest_models import app, db, Student, Professor, Course, Join_Request, Course_Student
-from rest_models import rf_student, args_student, rf_professor, args_professor, rf_course, args_course, rf_join_request, args_join_request, rf_course_student, args_course_student
+from rest_models import  rf_student, args_student, rf_professor, args_professor, rf_course, args_course, rf_join_request, args_join_request, rf_course_student, args_course_student
 from rest_models import args_student_update, args_professor_update, args_course_update, args_join_request_update
 import jwt
 import datetime
@@ -36,6 +36,17 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
 
     return decorated
+
+def basicStudentToObj (student):
+    return {
+    "student_id": student.student_id,
+    "first_name": student.first_name,
+    "last_name": student.last_name,
+    "email": student.email,
+    "password": student.password,
+    "iq": student.iq,
+    "GPA": student.GPA,
+}  
 
 class Students(Resource):    
     @marshal_with(rf_student)
@@ -98,6 +109,15 @@ class Students(Resource):
         db.session.commit()
         return deletedObj, 201
  
+def professorToObj (professor):
+    return {
+    "professor_id": professor.professor_id,
+    "first_name": professor.first_name,
+    "last_name": professor.last_name,
+    "email": professor.email,
+    "password": professor.password,
+    "subject": professor.subject,
+}  
 
 class Professors(Resource):
     @marshal_with(rf_professor)
@@ -160,21 +180,25 @@ class Professors(Resource):
         return deletedObj, 201
 
 class Courses(Resource):
-    @marshal_with(rf_course)
     @token_required
     def get(current_user, self, id):
-        result = Course.query.get(id)
-        if not result:
+        course = basicCourseListToObj(Course.query.get(id))
+        
+
+        if not course:
             abort(404, message="course does not exist")
 
-        if current_user.user_type == "professor" and result.professor_id != current_user.professor_id:
+        if current_user.user_type == "professor" and course['professor_id'] != current_user.professor_id:
             abort(403, message="Access denied")  
         elif current_user.user_type == "student":
-            course_student = Course_Student.query.filter_by(course_id=result.course_id, student_id=current_user.student_id).first()
+            course_student = Course_Student.query.filter_by(course_id=course['course_id'], student_id=current_user.student_id).first()
             if not course_student:
                 abort(403, message="Access denied")  
 
-        return result
+        professor = Professor.query.get(course['professor_id'])
+        course['professor'] = professorToObj(professor) 
+
+        return course
 
     @marshal_with(rf_course)
     @token_required
@@ -189,7 +213,7 @@ class Courses(Resource):
         course = Course(professor_id=arguments.professor_id, subject=arguments.subject)
         db.session.add(course)
         db.session.commit()
-        return course, 201   
+        return course, 201
 
     @marshal_with(rf_course)
     @token_required
@@ -227,13 +251,21 @@ class Courses(Resource):
         if not deletedObj:
             abort(404, message="course does not exist")
 
-        if current_user.user_type == "professor" and result.professor_id != current_user.professor_id:
+        if current_user.user_type == "professor" and deletedObj.professor_id != current_user.professor_id:
             abort(403, message="Access denied")  
         elif current_user.user_type == "student":
             abort(403, message="Access denied")    
         result.delete()
         db.session.commit()
         return deletedObj, 201
+
+def requestToObj (request):
+    return {
+    "join_request_id": request.join_request_id,
+    "course_id": request.course_id,
+    "student_id": request.student_id,
+    "status": request.status
+}  
 
 class Join_Requests(Resource):
     @marshal_with(rf_join_request)
@@ -347,6 +379,52 @@ class Join_Requests(Resource):
         db.session.commit()
         return deletedObj, 201
 
+def requestsListToObj (course):
+    return {
+    "course_id": course.course_id,
+    "professor_id": course.professor_id,
+    "subject": course.subject,
+}  
+
+class Requests_List(Resource):
+    @token_required 
+    def get(current_user, self):
+        if current_user.user_type == 'student':
+            student = basicStudentToObj(Student.query.get(current_user.student_id))
+            joinRequests = Join_Request.query.filter_by(student_id=current_user.student_id).all()
+            objJoinRequests = list(map(lambda x: requestToObj(x), joinRequests)) 
+
+            allRequests = []
+            for request in objJoinRequests:
+                course = basicCourseListToObj(Course.query.filter_by(course_id=request['course_id']).first())
+                professor = professorToObj(Professor.query.get(course['professor_id']))
+                course['professor'] = professor
+                request['course'] = course
+                request['student'] = student
+                allRequests.append(request)
+
+            parsedRequests = list(map(lambda x: x, allRequests))
+        else:
+            professor = professorToObj(Professor.query.get(current_user.professor_id))
+            professorCourses = Course.query.filter_by(professor_id=current_user.professor_id)
+            professorCoursesIds = list(map(lambda x: x.course_id, professorCourses)) 
+            joinRequests = Join_Request.query.filter(Course.course_id.in_(professorCoursesIds))
+            objJoinRequests = list(map(lambda x: requestToObj(x), joinRequests)) 
+
+            allRequests = []
+            for request in objJoinRequests:
+                student = basicStudentToObj(Student.query.get(request['student_id']))
+                course = basicCourseListToObj(Course.query.filter_by(course_id=request['course_id']).first())
+                course['professor'] = professor
+                request['course'] = course
+                request['student'] = student
+                if request['status'] == 'pending':
+                    allRequests.append(request)
+
+            parsedRequests = list(map(lambda x: x, allRequests)) 
+
+        return jsonify({'requests' : parsedRequests})        
+
 class Course_Students(Resource):
     @marshal_with(rf_course_student)
     def get(self, id):
@@ -408,11 +486,64 @@ class Course_Students(Resource):
         db.session.commit()
         return deletedObj, 201
 
+def basicCourseListToObj (course):
+    return {
+    "course_id": course.course_id,
+    "professor_id": course.professor_id,
+    "subject": course.subject,
+}  
+
+def courseListToObj (course):
+    return {
+    "course_id": course['course_id'],
+    "professor_id": course['professor_id'],
+    "professor": course['professor'],
+    "subject": course['subject'],
+}  
+
 class Courses_List(Resource):
-    @marshal_with(rf_course)
-    def get(self):
-        result = Course.query.filter_by().all()
-        return result
+    @token_required 
+    def get(current_user, self):
+        if current_user.user_type == 'student':
+            studentsCourses = Course_Student.query.filter_by(student_id=current_user.student_id)
+            allBasicCourses = list(map(lambda x: basicCourseListToObj(x), Course.query.filter_by().all())) 
+            allCourses = []
+            for course in allBasicCourses:
+                professor = Professor.query.get(course['professor_id'])
+                course['professor'] = professorToObj(professor)
+                allCourses.append(course)
+
+
+            allCourses = list(map(lambda x: courseListToObj(x), allCourses)) 
+            allIds = list(map(lambda x: x.course_id, studentsCourses))
+
+            freeCourses = list(filter(lambda x: (x['course_id'] not in allIds), allCourses))
+            freeCoursesWithRequests = []
+
+            for course in freeCourses:
+                request = Join_Request.query.filter_by(student_id=current_user.student_id, course_id=course['course_id']).first()
+                if request:
+                    req = requestToObj(request)
+                    course['request'] = req
+                freeCoursesWithRequests.append(course) 
+
+            parsedJoinedCourses = list(filter(lambda x: (x['course_id'] in allIds), allCourses));
+            parsedFreeCourses = freeCoursesWithRequests    
+            
+        else:
+            professor = Professor.query.get(current_user.professor_id)
+            professorCourses = Course.query.filter_by(professor_id=current_user.professor_id)
+            allJoinedCourses = list(map(lambda x: basicCourseListToObj(x), professorCourses)) 
+            allCourses = []
+            for course in allJoinedCourses:
+                course['professor'] = professorToObj(professor)
+                allCourses.append(course)
+
+            parsedJoinedCourses = list(map(lambda x: courseListToObj(x), allCourses)) 
+            parsedFreeCourses = []
+
+        return jsonify({'joined' : parsedJoinedCourses , "free": parsedFreeCourses})
+
 
 class Login(Resource):
     def post(self):
@@ -455,7 +586,8 @@ class Login(Resource):
 api.add_resource(Students, "/students/<int:id>")
 api.add_resource(Professors, "/professors/<int:id>")
 api.add_resource(Courses, "/courses/<int:id>")
-api.add_resource(Courses_List, "/courses/")
+api.add_resource(Courses_List, "/courses_list")
+api.add_resource(Requests_List, "/requests_list")
 api.add_resource(Join_Requests, "/join_requests/<int:id>")
 api.add_resource(Course_Students, "/course_students/<int:id>")
 api.add_resource(Login, "/login")
